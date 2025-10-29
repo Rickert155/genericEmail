@@ -5,6 +5,9 @@ import os
 import csv
 import time
 
+def current_time() -> str:
+    return time.strftime('%d/%m/%Y %H:%M:%S')
+
 def initParser():
     if not os.path.exists(done_dir):os.makedirs(done_dir)
     if not os.path.exists(result_dir):os.makedirs(result_dir)
@@ -29,7 +32,3 @@ def RecordResult(domain:str, email:str, company:str, location:str, category:str)
         write = csv.writer(file)
         write.writerow([domain, email, company, location, category])
 
-    with open(done_file, 'a+') as file:
-        current_time = time.strftime('%d/%m/%Y %H:%M:%S')
-        write = csv.writer(file)
-        write.writerow([domain, company, current_time])

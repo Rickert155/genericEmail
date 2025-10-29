@@ -3,10 +3,10 @@ from SinCity.colors import RED, GREEN, BLUE, RESET
 
 from modules.miniTools import (
         initParser,
-        RecordResult
+        RecordResult,
+        current_time
         )
 from modules.config import contact_pages, base_dir, done_file
-
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 
@@ -43,7 +43,7 @@ def print_emails(email_list:list[str]):
         print(f'{GREEN}[{number_email}] {email}{RESET}')
 
 
-def Generics(domain:str):
+def Generics(domain:str, company:str):
     """Зададим стартовое состояние для driver"""
     driver = None
     email_list = []
@@ -54,18 +54,18 @@ def Generics(domain:str):
         domain = processingDomain(domain=domain)
         
         driver = driver_chrome()
+        driver.set_page_load_timeout(40)
         url = f'http://{domain}'
         driver.get(url)
         
         """Получим список страниц контактов"""
         list_pages = ListPages(driver, domain=domain)
-        if list_pages:print(f'{BLUE}Contact pages: {list_pages}{RESET}')
-        else:print(f'{RED}The list of contact pages is empty{RESET}')
+        if len(list_pages) == 0:print(f'{RED}The list of contact pages is empty{RESET}')
 
         email_list = searchEmail(driver)
-        if len(email_list) > 0:
+        if email_list != None and len(email_list) > 0:
             #print_emails(email_list=email_list)
-            return
+            return email_list
         if len(email_list) == 0:
             if len(list_pages) > 0:
                 for i, page in enumerate(list_pages):
@@ -73,8 +73,7 @@ def Generics(domain:str):
                     driver.get(page)
                     email_list = searchEmail(driver)
                     if len(email_list) > 0:
-                        #print_emails(email_list=email_list)
-                        return
+                        return email_list
             else:
                 print(f'{RED}Страниц контактов не найдено обнаружены{RESET}')
 
@@ -85,8 +84,11 @@ def Generics(domain:str):
         sys.exit(f'{RED}\nExit...{RESET}')
     except Exception as err:
         print(f'{RED}{err}{RESET}')
-
     finally:
+        with open(done_file, 'a') as file:
+            writer = csv.writer(file)
+            writer.writerow([domain, company, current_time()])
+
         if driver != None:
             driver.quit()
     
@@ -109,7 +111,6 @@ def searchEmail(driver) -> list[str]:
             word = word.strip().lower()
             if '@' in word and word not in list_email:
                 list_email.append(word)
-                print(word)
     
     return list_email
 
@@ -135,27 +136,40 @@ if __name__ == '__main__':
     params = sys.argv
     if len(params) > 2 and '--debug' in params[1]:
         domain = params[2]
-        email_list = Generics(domain=domain)
-        if email_list:
+        email_list = Generics(domain=domain, company=company)
+        if email_list != None and len(email_list) > 0:
             print_emails(email_list=email_list)
+            RecordResult(
+                    domain=domain, 
+                    email=email,
+                    company=company,
+                    category=category,
+                    location=location
+                    )
     else:
         list_base = ListBase()
         if list_base:
             for base in list_base:
                 with open(base, 'r') as file:
-                    
-                    """получим список пройденных доменов"""
                     complite_list_domain = CompliteListDomain()
-                    
+                    number_domain = 0
                     for row in csv.DictReader(file):
+                        number_domain+=1
                         domain = row['Domain']
                         company = row['Company']
-                        try:location = row['Location']
-                        except:location = None
-                        try:category = row['Category']
-                        except:category = None
+                        location = row.get('Location')
+                        category = row.get('Category')
                         
                         if domain not in complite_list_domain:
-                            email_list = Generics(domain=domain)
-                            if email_list:
+                            print(f'{GREEN}[{number_domain}] {domain}{RESET}')
+                            email_list = Generics(domain=domain, company=company)
+                            if email_list != None and len(email_list) > 0:
                                 print_emails(email_list=email_list)
+                                for email in email_list:
+                                    RecordResult(
+                                            domain=domain, 
+                                            email=email,
+                                            company=company,
+                                            category=category,
+                                            location=location
+                                            )
